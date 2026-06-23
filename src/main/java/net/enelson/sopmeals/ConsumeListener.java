@@ -68,6 +68,9 @@ public class ConsumeListener implements Listener {
         boolean limitOk = !manager.isRepeatLimitExceeded(player, key);
         if (limitOk) {
             manager.applyFoodBonus(player, key);
+        } else {
+            // Переедание — накладываем дебаффы.
+            manager.applyOvereatingEffects(player);
         }
 
         // Комбо (всегда регистрируем в историю комбо, даже если лимит на повторы).

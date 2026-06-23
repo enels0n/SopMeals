@@ -34,6 +34,7 @@ public class MealManager {
     private long repeatPeriodMillis;
     private boolean repeatBlockConsume;
     private String repeatLimitMessage;
+    private List<String> overeatingEffects = new ArrayList<>();
 
     // Per-food bonus
     private Map<String, int[]> foodBonuses = new HashMap<>(); // key -> [food, saturation*100]
@@ -63,11 +64,13 @@ public class MealManager {
             repeatPeriodMillis = Math.max(1, rl.getLong("period-seconds", 300)) * 1000L;
             repeatBlockConsume = rl.getBoolean("block-consume", false);
             repeatLimitMessage = rl.getString("message", "");
+            overeatingEffects = rl.getStringList("overeating-effects");
         } else {
             repeatMaxPerPeriod = 0; // 0 = disabled
             repeatPeriodMillis = 300000L;
             repeatBlockConsume = false;
             repeatLimitMessage = "";
+            overeatingEffects = new ArrayList<>();
         }
 
         // Per-food bonuses
@@ -305,6 +308,19 @@ public class MealManager {
 
     public String getRepeatLimitMessage() {
         return repeatLimitMessage;
+    }
+
+    /** Накладывает дебаффы переедания на игрока. */
+    public void applyOvereatingEffects(Player player) {
+        if (overeatingEffects == null || overeatingEffects.isEmpty()) {
+            return;
+        }
+        for (String effectString : overeatingEffects) {
+            PotionEffect effect = parseEffect(effectString);
+            if (effect != null) {
+                player.addPotionEffect(effect);
+            }
+        }
     }
 
     // ===== Per-food bonus =====
