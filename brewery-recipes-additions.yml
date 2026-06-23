@@ -1,0 +1,66 @@
+# Новые рецепты для BreweryX.
+# Вставь содержимое блоков ниже внутрь секции `recipes:` в файле рецептов BreweryX
+# (там же, где wine/beer/coffee и т.д.). Отступы важны — два пробела перед id рецепта.
+#
+# Имя "нормального" качества (среднее в name: bad/normal/good) — это то, что
+# SopMeals использует как ключ "brewery:Имя". Оно указано в комментарии у каждого рецепта.
+
+  # ключ для SopMeals: brewery:Green Tea
+  green_tea:
+    name: Bitter Tea/Green Tea/Fine Green Tea
+    ingredients:
+    - Dried_Kelp/3
+    cookingtime: 2
+    distillruns: 0
+    color: GREEN
+    difficulty: 2
+    alcohol: 0
+    lore:
+    - +++ &8Успокаивающий
+    effects:
+    - REGENERATION/1/2-5
+
+  # ключ для SopMeals: brewery:Apple Juice
+  apple_juice:
+    name: Водянистый сок/Apple Juice/Свежий яблочный сок
+    ingredients:
+    - Apple/6
+    cookingtime: 2
+    distillruns: 0
+    color: f86820
+    difficulty: 2
+    alcohol: 0
+    lore:
+    - +++ &8Свежевыжатый
+
+  # ключ для SopMeals: brewery:Mulled Wine
+  mulled_wine:
+    name: Кислый глинтвейн/Mulled Wine/Пряный глинтвейн
+    ingredients:
+    - Sweet_Berries/5
+    - Sugar/2
+    cookingtime: 6
+    distillruns: 0
+    wood: 2
+    age: 8
+    color: DARK_RED
+    difficulty: 5
+    alcohol: 10
+    lore:
+    - +++ &8Тёплый и пряный
+    effects:
+    - FIRE_RESISTANCE/1/60-120
+
+  # ключ для SopMeals: brewery:Berry Smoothie
+  berry_smoothie:
+    name: Жидкий смузи/Berry Smoothie/Густой ягодный смузи
+    ingredients:
+    - Sweet_Berries/4
+    - Milk_Bucket/1
+    cookingtime: 2
+    distillruns: 0
+    color: PINK
+    difficulty: 3
+    alcohol: 0
+    lore:
+    - +++ &8Освежающий

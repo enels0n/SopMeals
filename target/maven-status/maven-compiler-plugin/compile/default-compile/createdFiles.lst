@@ -1,0 +1,8 @@
+net\enelson\sopmeals\ConsumeListener.class
+net\enelson\sopmeals\MealManager$Consumed.class
+net\enelson\sopmeals\MealManager.class
+net\enelson\sopmeals\SopMeals.class
+net\enelson\sopmeals\ComboDefinition.class
+net\enelson\sopmeals\BreweryHook.class
+net\enelson\sopmeals\event\MealComboEvent.class
+net\enelson\sopmeals\MealCommand.class

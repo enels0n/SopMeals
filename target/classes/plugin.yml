@@ -1,0 +1,15 @@
+name: SopMeals
+main: net.enelson.sopmeals.SopMeals
+version: 1.0.0
+authors: [E_NeLsOn]
+api-version: "1.21"
+softdepend: [PlaceholderAPI, BreweryX, Brewery]
+commands:
+  sopmeals:
+    description: SopMeals administration
+    usage: /sopmeals reload
+    aliases: [meals]
+permissions:
+  sopmeals.admin:
+    description: Access to SopMeals admin commands
+    default: op

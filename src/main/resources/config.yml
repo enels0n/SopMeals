@@ -1,0 +1,340 @@
+# SopMeals
+# Еда и напитки, съеденные в течение одного "приёма пищи", складываются в комбо.
+# Когда набор съеденного совпадает с комбо ниже — игрок получает бонус сытости.
+# Обычная ванильная еда продолжает работать как всегда, бонус идёт сверху.
+
+# Сколько секунд съеденные предметы считаются частью одного приёма пищи.
+meal-window-seconds: 120
+
+# Убирать ли ингредиенты из учёта после срабатывания комбо,
+# чтобы один и тот же съеденный предмет не засчитывался в два комбо подряд.
+consume-on-combo: true
+
+# Блокировать ванильное восстановление голода и насыщения от еды.
+# true  = обычная еда сама по себе НЕ кормит, сытость дают только комбо.
+# false = еда работает как в ваниле, а бонус комбо идёт сверху.
+block-vanilla-nutrition: false
+
+# Минимальный интервал (в секундах) между повторными срабатываниями одного комбо для игрока.
+combo-cooldown-seconds: 1
+
+# Комбинации.
+# ingredients: ключ -> требуемое количество.
+#   - ванильные предметы: имя Material (BREAD, MILK_BUCKET, COOKED_BEEF, BAKED_POTATO ...)
+#   - напитки BreweryX:    "brewery:Имя" — это имя рецепта нормального качества
+#       (среднее из "name: bad/normal/good" в recipes.yml; для wine это "Red Wine",
+#        для beer — "Beer", для rum — "Spicy Rum" и т.д.). Регистр не важен.
+# food:        сколько единиц голода добавить (1 = пол-окорочка)
+# saturation:  сколько насыщения добавить
+# effects:     список "ТИП:длительность_тиков:уровень" (необязательно)
+# message:     сообщение игроку при срабатывании (необязательно, поддерживает & и PlaceholderAPI)
+combos:
+  # ========= Ванильная еда =========
+
+  # --- Классические пары ---
+  bread-and-milk:
+    ingredients:
+      BREAD: 1
+      MILK_BUCKET: 1
+    food: 2
+    saturation: 4.0
+    effects: []
+    message: "&aХлеб, запитый молоком — стало сытнее!"
+
+  cookies-and-milk:
+    ingredients:
+      COOKIE: 1
+      MILK_BUCKET: 1
+    food: 2
+    saturation: 4.0
+    effects: []
+    message: "&fПеченье с молоком — как в детстве."
+
+  # --- Основное блюдо + гарнир ---
+  meat-and-potatoes:
+    ingredients:
+      COOKED_BEEF: 1
+      BAKED_POTATO: 1
+    food: 3
+    saturation: 5.0
+    effects: []
+    message: "&eМясо с картошкой — сытно и просто."
+
+  fish-and-chips:
+    ingredients:
+      COOKED_COD: 1
+      BAKED_POTATO: 1
+    food: 3
+    saturation: 5.0
+    effects: []
+    message: "&bРыба с картошкой — фиш-н-чипс!"
+
+  meat-sandwich:
+    ingredients:
+      BREAD: 1
+      COOKED_PORKCHOP: 1
+    food: 3
+    saturation: 5.0
+    effects: []
+    message: "&eСытный сэндвич с мясом."
+
+  honey-toast:
+    ingredients:
+      BREAD: 1
+      HONEY_BOTTLE: 1
+    food: 2
+    saturation: 4.0
+    effects: []
+    message: "&6Хлеб с мёдом — сладко и сытно."
+
+  sushi-roll:
+    ingredients:
+      COOKED_SALMON: 1
+      DRIED_KELP: 1
+    food: 3
+    saturation: 5.0
+    effects: []
+    message: "&bЛосось в ламинарии — почти как суши."
+
+  stew-and-bread:
+    ingredients:
+      MUSHROOM_STEW: 1
+      BREAD: 1
+    food: 3
+    saturation: 5.0
+    effects: []
+    message: "&eПохлёбка с хлебом — деревенский обед."
+
+  rabbit-and-carrots:
+    ingredients:
+      COOKED_RABBIT: 1
+      CARROT: 1
+    food: 3
+    saturation: 5.0
+    effects: []
+    message: "&eКролик с морковью — по-охотничьи."
+
+  mutton-roast:
+    ingredients:
+      COOKED_MUTTON: 1
+      BAKED_POTATO: 1
+    food: 3
+    saturation: 5.0
+    effects: []
+    message: "&eЖаркое из баранины с картофелем."
+
+  pie-and-milk:
+    ingredients:
+      PUMPKIN_PIE: 1
+      MILK_BUCKET: 1
+    food: 2
+    saturation: 4.0
+    effects: []
+    message: "&dПирог с молоком — десерт удался."
+
+  berries-and-honey:
+    ingredients:
+      SWEET_BERRIES: 1
+      HONEY_BOTTLE: 1
+    food: 2
+    saturation: 3.0
+    effects: []
+    message: "&dЯгоды в мёде — сладкое лакомство."
+
+  melon-refresher:
+    ingredients:
+      MELON_SLICE: 1
+      GLOW_BERRIES: 1
+    food: 2
+    saturation: 3.0
+    effects: []
+    message: "&aАрбуз с ягодами — освежает в жару."
+
+  # --- Сытный обед (3 ингредиента) ---
+  roast-dinner:
+    ingredients:
+      COOKED_CHICKEN: 1
+      BAKED_POTATO: 1
+      CARROT: 1
+    food: 5
+    saturation: 7.0
+    effects: []
+    message: "&6Полноценный обед: курица, картофель и овощи."
+
+  # --- Особое (золотая еда) ---
+  golden-treat:
+    ingredients:
+      GOLDEN_CARROT: 1
+      GOLDEN_APPLE: 1
+    food: 6
+    saturation: 10.0
+    effects:
+      - "ABSORPTION:600:0"
+    message: "&6Золотое угощение! Ты полон сил."
+
+  # ========= Еда + напитки BreweryX =========
+  # Имена рецептов — нормального качества из recipes.yml. Регистр не важен.
+
+  steak-and-wine:
+    ingredients:
+      COOKED_BEEF: 1
+      "brewery:Red Wine": 1
+    food: 4
+    saturation: 6.0
+    effects: []
+    message: "&cСтейк под бокал вина — благородно."
+
+  bread-and-beer:
+    ingredients:
+      BREAD: 1
+      "brewery:Beer": 1
+    food: 3
+    saturation: 5.0
+    effects: []
+    message: "&6Хлеб и пиво — простая радость."
+
+  coffee-and-cookie:
+    ingredients:
+      COOKIE: 1
+      "brewery:Coffee": 1
+    food: 2
+    saturation: 3.0
+    effects:
+      - "SPEED:300:0"
+    message: "&fКофе с печеньем — бодрое утро!"
+
+  cocoa-and-cookie:
+    ingredients:
+      COOKIE: 1
+      "brewery:Hot Chocolate": 1
+    food: 2
+    saturation: 4.0
+    effects: []
+    message: "&6Печенье с горячим шоколадом — уют."
+
+  fish-and-rum:
+    ingredients:
+      COOKED_COD: 1
+      "brewery:Spicy Rum": 1
+    food: 4
+    saturation: 6.0
+    effects: []
+    message: "&3Рыба и ром — обед моряка."
+
+  potatoes-and-vodka:
+    ingredients:
+      BAKED_POTATO: 1
+      "brewery:Vodka": 1
+    food: 4
+    saturation: 6.0
+    effects: []
+    message: "&fКартошка под водочку — классика."
+
+  apple-and-cider:
+    ingredients:
+      APPLE: 1
+      "brewery:Apple Cider": 1
+    food: 3
+    saturation: 4.0
+    effects: []
+    message: "&aЯблоко и сидр — вкус осени."
+
+  nightcap:
+    ingredients:
+      COOKED_BEEF: 1
+      "brewery:Whiskey": 1
+    food: 5
+    saturation: 7.0
+    effects:
+      - "FIRE_RESISTANCE:300:0"
+    message: "&6Мясо и виски — согревающий ужин."
+
+  stew-and-mead:
+    ingredients:
+      MUSHROOM_STEW: 1
+      "brewery:Mead": 1
+    food: 4
+    saturation: 6.0
+    effects: []
+    message: "&6Похлёбка с медовухой — по-домашнему."
+
+  iced-coffee-cookie:
+    ingredients:
+      COOKIE: 1
+      "brewery:Iced Coffee": 1
+    food: 2
+    saturation: 3.0
+    effects:
+      - "SPEED:300:0"
+    message: "&bПеченье и холодный кофе — летняя бодрость."
+
+  # --- Комбо на НОВЫХ напитках (см. brewery-recipes-additions.yml) ---
+  tea-and-cookie:
+    ingredients:
+      COOKIE: 1
+      "brewery:Green Tea": 1
+    food: 2
+    saturation: 3.0
+    effects:
+      - "REGENERATION:100:0"
+    message: "&aЧай с печеньем — спокойный вечер."
+
+  breakfast-juice:
+    ingredients:
+      BREAD: 1
+      "brewery:Apple Juice": 1
+    food: 2
+    saturation: 4.0
+    effects: []
+    message: "&6Хлеб и яблочный сок — лёгкий завтрак."
+
+  winter-warmer:
+    ingredients:
+      PUMPKIN_PIE: 1
+      "brewery:Mulled Wine": 1
+    food: 4
+    saturation: 6.0
+    effects:
+      - "FIRE_RESISTANCE:200:0"
+    message: "&cПирог и глинтвейн — зимнее тепло."
+
+  smoothie-snack:
+    ingredients:
+      SWEET_BERRIES: 1
+      "brewery:Berry Smoothie": 1
+    food: 3
+    saturation: 4.0
+    effects: []
+    message: "&dЯгодный смузи с ягодами — двойная свежесть."
+
+  # ========= Большие комбо =========
+
+  hearty-feast:
+    ingredients:
+      COOKED_BEEF: 1
+      BAKED_POTATO: 1
+      BREAD: 1
+      "brewery:Red Wine": 1
+    food: 6
+    saturation: 8.0
+    effects:
+      - "REGENERATION:200:0"
+    message: "&6Настоящий пир! Ты сыт и доволен."
+
+  royal-banquet:
+    ingredients:
+      COOKED_BEEF: 1
+      BAKED_POTATO: 1
+      BREAD: 1
+      PUMPKIN_PIE: 1
+      "brewery:Red Wine": 1
+    food: 10
+    saturation: 14.0
+    effects:
+      - "REGENERATION:300:0"
+      - "SATURATION:100:0"
+    message: "&6&lКоролевский банкет! Ты сыт до отвала."
+
+messages:
+  reloaded: "&aSopMeals: конфиг перезагружен."
+  no-permission: "&cУ тебя нет прав на эту команду."
