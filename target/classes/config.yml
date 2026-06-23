@@ -15,6 +15,66 @@ consume-on-combo: true
 # false = еда работает как в ваниле, а бонус комбо идёт сверху.
 block-vanilla-nutrition: false
 
+# Ограничение повторного поедания одной и той же еды.
+# Нельзя спамить одну еду — после max-per-period штук за period-seconds она перестаёт давать бонус.
+# block-consume: true — полностью блокирует поедание сверх лимита (отменяет событие).
+repeat-limit:
+  max-per-period: 3
+  period-seconds: 300
+  block-consume: false
+  message: "&cТы уже наелся этим. Попробуй что-нибудь другое."
+
+# Базовый бонус за каждый отдельный предмет (вне комбо).
+# food = единицы голода (1 = пол-окорочка), saturation = насыщение.
+# Если предмета нет в списке — бонус 0 (только ваниль + комбо).
+# Работает с учётом repeat-limit: если лимит превышен — бонус не даётся.
+foods:
+  BREAD:
+    food: 1
+    saturation: 1.0
+  COOKED_BEEF:
+    food: 2
+    saturation: 2.0
+  COOKED_PORKCHOP:
+    food: 2
+    saturation: 2.0
+  COOKED_CHICKEN:
+    food: 1
+    saturation: 1.5
+  COOKED_MUTTON:
+    food: 1
+    saturation: 1.5
+  COOKED_SALMON:
+    food: 1
+    saturation: 1.5
+  COOKED_COD:
+    food: 1
+    saturation: 1.0
+  BAKED_POTATO:
+    food: 1
+    saturation: 1.0
+  COOKED_RABBIT:
+    food: 1
+    saturation: 1.5
+  PUMPKIN_PIE:
+    food: 1
+    saturation: 1.0
+  GOLDEN_CARROT:
+    food: 2
+    saturation: 3.0
+  COOKIE:
+    food: 0
+    saturation: 0.5
+  DRIED_KELP:
+    food: 0
+    saturation: 0.5
+  HONEY_BOTTLE:
+    food: 1
+    saturation: 0.5
+  MILK_BUCKET:
+    food: 0
+    saturation: 1.0
+
 # Минимальный интервал (в секундах) между повторными срабатываниями одного комбо для игрока.
 combo-cooldown-seconds: 1
 

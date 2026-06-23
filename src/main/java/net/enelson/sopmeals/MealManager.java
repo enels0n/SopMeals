@@ -29,10 +29,21 @@ public class MealManager {
     private long comboCooldownMillis;
     private List<ComboDefinition> combos = new ArrayList<>();
 
+    // Repeat limit
+    private int repeatMaxPerPeriod;
+    private long repeatPeriodMillis;
+    private boolean repeatBlockConsume;
+    private String repeatLimitMessage;
+
+    // Per-food bonus
+    private Map<String, int[]> foodBonuses = new HashMap<>(); // key -> [food, saturation*100]
+
     // Недавно съеденное: игрок -> список (ключ ингредиента + время).
     private final Map<UUID, List<Consumed>> recent = new ConcurrentHashMap<>();
     // Кулдаун срабатывания комбо: игрок -> (имя комбо -> время последнего срабатывания).
     private final Map<UUID, Map<String, Long>> lastTrigger = new ConcurrentHashMap<>();
+    // История поедания для лимита повторов: игрок -> (ключ -> список времён).
+    private final Map<UUID, Map<String, List<Long>>> repeatHistory = new ConcurrentHashMap<>();
 
     public MealManager(SopMeals plugin) {
         this.plugin = plugin;
@@ -44,6 +55,37 @@ public class MealManager {
         consumeOnCombo = plugin.getConfig().getBoolean("consume-on-combo", true);
         blockVanillaNutrition = plugin.getConfig().getBoolean("block-vanilla-nutrition", false);
         comboCooldownMillis = Math.max(0, plugin.getConfig().getLong("combo-cooldown-seconds", 1)) * 1000L;
+
+        // Repeat limit
+        ConfigurationSection rl = plugin.getConfig().getConfigurationSection("repeat-limit");
+        if (rl != null) {
+            repeatMaxPerPeriod = rl.getInt("max-per-period", 3);
+            repeatPeriodMillis = Math.max(1, rl.getLong("period-seconds", 300)) * 1000L;
+            repeatBlockConsume = rl.getBoolean("block-consume", false);
+            repeatLimitMessage = rl.getString("message", "");
+        } else {
+            repeatMaxPerPeriod = 0; // 0 = disabled
+            repeatPeriodMillis = 300000L;
+            repeatBlockConsume = false;
+            repeatLimitMessage = "";
+        }
+
+        // Per-food bonuses
+        Map<String, int[]> bonuses = new HashMap<>();
+        ConfigurationSection foodsSection = plugin.getConfig().getConfigurationSection("foods");
+        if (foodsSection != null) {
+            for (String key : foodsSection.getKeys(false)) {
+                ConfigurationSection fs = foodsSection.getConfigurationSection(key);
+                if (fs == null) {
+                    continue;
+                }
+                int food = fs.getInt("food", 0);
+                int sat = (int) (fs.getDouble("saturation", 0.0) * 100);
+                bonuses.put(normalizeKey(key), new int[] { food, sat });
+            }
+        }
+        foodBonuses = bonuses;
+        plugin.getLogger().info("Загружено бонусов еды: " + foodBonuses.size());
 
         List<ComboDefinition> loaded = new ArrayList<>();
         ConfigurationSection combosSection = plugin.getConfig().getConfigurationSection("combos");
@@ -212,6 +254,79 @@ public class MealManager {
     public void clear(UUID uuid) {
         recent.remove(uuid);
         lastTrigger.remove(uuid);
+        repeatHistory.remove(uuid);
+    }
+
+    // ===== Repeat limit =====
+
+    /** Записывает факт поедания ключа (для учёта повторов). */
+    public void recordConsume(Player player, String key) {
+        if (repeatMaxPerPeriod <= 0) {
+            return;
+        }
+        String normalized = normalizeKey(key);
+        UUID uuid = player.getUniqueId();
+        Map<String, List<Long>> history = repeatHistory.computeIfAbsent(uuid, k -> new HashMap<>());
+        List<Long> times = history.computeIfAbsent(normalized, k -> new ArrayList<>());
+        times.add(System.currentTimeMillis());
+    }
+
+    /** Проверяет, превышен ли лимит повторов для данного ключа (без записи). */
+    public boolean isRepeatLimitExceeded(Player player, String key) {
+        if (repeatMaxPerPeriod <= 0) {
+            return false;
+        }
+        String normalized = normalizeKey(key);
+        UUID uuid = player.getUniqueId();
+        Map<String, List<Long>> history = repeatHistory.get(uuid);
+        if (history == null) {
+            return false;
+        }
+        List<Long> times = history.get(normalized);
+        if (times == null) {
+            return false;
+        }
+        long cutoff = System.currentTimeMillis() - repeatPeriodMillis;
+        int count = 0;
+        Iterator<Long> it = times.iterator();
+        while (it.hasNext()) {
+            if (it.next() < cutoff) {
+                it.remove();
+            } else {
+                count++;
+            }
+        }
+        return count >= repeatMaxPerPeriod;
+    }
+
+    public boolean isBlockConsume() {
+        return repeatBlockConsume;
+    }
+
+    public String getRepeatLimitMessage() {
+        return repeatLimitMessage;
+    }
+
+    // ===== Per-food bonus =====
+
+    /** Применяет настроенный бонус за конкретный предмет (вне комбо). */
+    public void applyFoodBonus(Player player, String key) {
+        String normalized = normalizeKey(key);
+        int[] bonus = foodBonuses.get(normalized);
+        if (bonus == null) {
+            return;
+        }
+        int foodBonus = bonus[0];
+        double satBonus = bonus[1] / 100.0;
+        if (foodBonus != 0) {
+            int newFood = Math.max(0, Math.min(20, player.getFoodLevel() + foodBonus));
+            player.setFoodLevel(newFood);
+        }
+        if (satBonus != 0.0) {
+            float maxSaturation = player.getFoodLevel();
+            float newSat = (float) Math.max(0.0, Math.min(maxSaturation, player.getSaturation() + satBonus));
+            player.setSaturation(newSat);
+        }
     }
 
     public boolean isBlockVanillaNutrition() {
