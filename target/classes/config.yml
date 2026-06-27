@@ -11,9 +11,9 @@ meal-window-seconds: 120
 consume-on-combo: true
 
 # Блокировать ванильное восстановление голода и насыщения от еды.
-# true  = обычная еда сама по себе НЕ кормит, сытость дают только комбо.
-# false = еда работает как в ваниле, а бонус комбо идёт сверху.
-block-vanilla-nutrition: false
+# true  = вся еда восстанавливает ровно столько, сколько прописано в "foods" ниже.
+# false = ваниль работает как обычно, а "foods" даёт бонус сверху.
+block-vanilla-nutrition: true
 
 # Ограничение повторного поедания одной и той же еды.
 # Нельзя спамить одну еду — после max-per-period штук за period-seconds она перестаёт давать бонус.
@@ -29,56 +29,145 @@ repeat-limit:
     - "HUNGER:200:0"
     - "NAUSEA:100:0"
 
-# Базовый бонус за каждый отдельный предмет (вне комбо).
-# food = единицы голода (1 = пол-окорочка), saturation = насыщение.
-# Если предмета нет в списке — бонус 0 (только ваниль + комбо).
-# Работает с учётом repeat-limit: если лимит превышен — бонус не даётся.
+# Сколько сытости (food) и насыщения (saturation) даёт каждый предмет.
+# food = единицы голода (1 = пол-окорочка; ваниль хлеба = 5, стейка = 8).
+# saturation = единицы насыщения (ваниль хлеба = 6.0, стейка = 12.8).
+# Если предмета нет в списке — он даёт 0 (при block-vanilla-nutrition: true это значит "не кормит").
+# Подправь под свой баланс. Комбо дают бонус СВЕРХ этих значений.
 foods:
-  BREAD:
-    food: 1
-    saturation: 1.0
+  # --- Мясо ---
   COOKED_BEEF:
-    food: 2
-    saturation: 2.0
+    food: 4
+    saturation: 6.0
   COOKED_PORKCHOP:
-    food: 2
-    saturation: 2.0
-  COOKED_CHICKEN:
-    food: 1
-    saturation: 1.5
+    food: 4
+    saturation: 6.0
   COOKED_MUTTON:
-    food: 1
-    saturation: 1.5
-  COOKED_SALMON:
-    food: 1
-    saturation: 1.5
-  COOKED_COD:
-    food: 1
-    saturation: 1.0
-  BAKED_POTATO:
-    food: 1
-    saturation: 1.0
+    food: 3
+    saturation: 5.0
+  COOKED_CHICKEN:
+    food: 3
+    saturation: 4.0
   COOKED_RABBIT:
-    food: 1
-    saturation: 1.5
-  PUMPKIN_PIE:
+    food: 3
+    saturation: 4.0
+  COOKED_SALMON:
+    food: 3
+    saturation: 5.0
+  COOKED_COD:
+    food: 2
+    saturation: 3.0
+  # --- Сырое мясо ---
+  BEEF:
     food: 1
     saturation: 1.0
-  GOLDEN_CARROT:
+  PORKCHOP:
+    food: 1
+    saturation: 1.0
+  MUTTON:
+    food: 1
+    saturation: 1.0
+  CHICKEN:
+    food: 1
+    saturation: 0.5
+  RABBIT:
+    food: 1
+    saturation: 1.0
+  SALMON:
+    food: 1
+    saturation: 0.5
+  COD:
+    food: 1
+    saturation: 0.5
+  # --- Хлеб и выпечка ---
+  BREAD:
     food: 2
     saturation: 3.0
   COOKIE:
-    food: 0
-    saturation: 0.5
-  DRIED_KELP:
-    food: 0
-    saturation: 0.5
-  HONEY_BOTTLE:
     food: 1
     saturation: 0.5
+  PUMPKIN_PIE:
+    food: 3
+    saturation: 3.0
+  CAKE:
+    food: 1
+    saturation: 1.0
+  # --- Овощи и фрукты ---
+  APPLE:
+    food: 2
+    saturation: 2.0
+  CARROT:
+    food: 1
+    saturation: 2.0
+  POTATO:
+    food: 0
+    saturation: 0.5
+  BAKED_POTATO:
+    food: 2
+    saturation: 3.0
+  BEETROOT:
+    food: 0
+    saturation: 0.5
+  MELON_SLICE:
+    food: 1
+    saturation: 1.0
+  SWEET_BERRIES:
+    food: 1
+    saturation: 0.5
+  GLOW_BERRIES:
+    food: 1
+    saturation: 0.5
+  CHORUS_FRUIT:
+    food: 2
+    saturation: 2.0
+  # --- Особое ---
+  GOLDEN_APPLE:
+    food: 4
+    saturation: 8.0
+  ENCHANTED_GOLDEN_APPLE:
+    food: 4
+    saturation: 8.0
+  GOLDEN_CARROT:
+    food: 3
+    saturation: 7.0
+  # --- Напитки ---
+  HONEY_BOTTLE:
+    food: 2
+    saturation: 2.0
   MILK_BUCKET:
     food: 0
     saturation: 1.0
+  # --- Прочее ---
+  DRIED_KELP:
+    food: 0
+    saturation: 0.5
+  MUSHROOM_STEW:
+    food: 3
+    saturation: 4.0
+  BEETROOT_SOUP:
+    food: 3
+    saturation: 4.0
+  RABBIT_STEW:
+    food: 5
+    saturation: 7.0
+  SUSPICIOUS_STEW:
+    food: 3
+    saturation: 4.0
+  ROTTEN_FLESH:
+    food: 1
+    saturation: 0.5
+  SPIDER_EYE:
+    food: 0
+    saturation: 0.0
+  POISONOUS_POTATO:
+    food: 0
+    saturation: 0.0
+  TROPICAL_FISH:
+    food: 0
+    saturation: 0.5
+  PUFFERFISH:
+    food: 0
+    saturation: 0.0
 
 # Минимальный интервал (в секундах) между повторными срабатываниями одного комбо для игрока.
 combo-cooldown-seconds: 1
