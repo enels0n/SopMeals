@@ -1,7 +1,6 @@
 package net.enelson.sopmeals;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -16,18 +15,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-/**
- * Хранит недавно съеденное каждым игроком и проверяет совпадения с комбо.
- */
 public class MealManager {
 
     private final SopMeals plugin;
 
-    private long mealWindowMillis;
-    private boolean consumeOnCombo;
     private boolean blockVanillaNutrition;
-    private long comboCooldownMillis;
-    private List<ComboDefinition> combos = new ArrayList<>();
 
     // Repeat limit
     private int repeatMaxPerPeriod;
@@ -37,14 +29,16 @@ public class MealManager {
     private List<String> overeatingEffects = new ArrayList<>();
 
     // Per-food bonus
-    private Map<String, int[]> foodBonuses = new HashMap<>(); // key -> [food, saturation*100]
+    private Map<String, int[]> foodBonuses = new HashMap<>();
 
-    // Недавно съеденное: игрок -> список (ключ ингредиента + время).
-    private final Map<UUID, List<Consumed>> recent = new ConcurrentHashMap<>();
-    // Кулдаун срабатывания комбо: игрок -> (имя комбо -> время последнего срабатывания).
-    private final Map<UUID, Map<String, Long>> lastTrigger = new ConcurrentHashMap<>();
-    // История поедания для лимита повторов: игрок -> (ключ -> список времён).
+    // Pairings (еда + напиток = эффекты)
+    private long pairingWindowMillis;
+    private List<PairingDefinition> pairings = new ArrayList<>();
+
+    // История поедания для лимита повторов
     private final Map<UUID, Map<String, List<Long>>> repeatHistory = new ConcurrentHashMap<>();
+    // Недавно съеденное для пар (ключ + время)
+    private final Map<UUID, List<Consumed>> recentConsumes = new ConcurrentHashMap<>();
 
     public MealManager(SopMeals plugin) {
         this.plugin = plugin;
@@ -52,10 +46,7 @@ public class MealManager {
 
     public void load() {
         plugin.reloadConfig();
-        mealWindowMillis = Math.max(1, plugin.getConfig().getLong("meal-window-seconds", 120)) * 1000L;
-        consumeOnCombo = plugin.getConfig().getBoolean("consume-on-combo", true);
-        blockVanillaNutrition = plugin.getConfig().getBoolean("block-vanilla-nutrition", false);
-        comboCooldownMillis = Math.max(0, plugin.getConfig().getLong("combo-cooldown-seconds", 1)) * 1000L;
+        blockVanillaNutrition = plugin.getConfig().getBoolean("block-vanilla-nutrition", true);
 
         // Repeat limit
         ConfigurationSection rl = plugin.getConfig().getConfigurationSection("repeat-limit");
@@ -66,7 +57,7 @@ public class MealManager {
             repeatLimitMessage = rl.getString("message", "");
             overeatingEffects = rl.getStringList("overeating-effects");
         } else {
-            repeatMaxPerPeriod = 0; // 0 = disabled
+            repeatMaxPerPeriod = 0;
             repeatPeriodMillis = 300000L;
             repeatBlockConsume = false;
             repeatLimitMessage = "";
@@ -88,44 +79,33 @@ public class MealManager {
             }
         }
         foodBonuses = bonuses;
-        plugin.getLogger().info("Загружено бонусов еды: " + foodBonuses.size());
 
-        List<ComboDefinition> loaded = new ArrayList<>();
-        ConfigurationSection combosSection = plugin.getConfig().getConfigurationSection("combos");
-        if (combosSection != null) {
-            for (String name : combosSection.getKeys(false)) {
-                ConfigurationSection section = combosSection.getConfigurationSection(name);
+        // Pairings
+        pairingWindowMillis = Math.max(1, plugin.getConfig().getLong("pairing-window-seconds", 60)) * 1000L;
+        List<PairingDefinition> loadedPairings = new ArrayList<>();
+        ConfigurationSection pairingsSection = plugin.getConfig().getConfigurationSection("pairings");
+        if (pairingsSection != null) {
+            for (String name : pairingsSection.getKeys(false)) {
+                ConfigurationSection section = pairingsSection.getConfigurationSection(name);
                 if (section == null) {
                     continue;
                 }
-                Map<String, Integer> ingredients = new HashMap<>();
-                ConfigurationSection ingSection = section.getConfigurationSection("ingredients");
-                if (ingSection != null) {
-                    for (String key : ingSection.getKeys(false)) {
-                        int count = ingSection.getInt(key, 1);
-                        if (count > 0) {
-                            ingredients.put(normalizeKey(key), count);
-                        }
-                    }
-                }
-                if (ingredients.isEmpty()) {
-                    plugin.getLogger().warning("Комбо '" + name + "' без ингредиентов — пропущено.");
+                String food = normalizeKey(section.getString("food", ""));
+                String drink = normalizeKey(section.getString("drink", ""));
+                if (food.isEmpty() || drink.isEmpty()) {
+                    plugin.getLogger().warning("Пара '" + name + "' без food/drink — пропущена.");
                     continue;
                 }
-                int food = section.getInt("food", 0);
-                double saturation = section.getDouble("saturation", 0.0);
                 List<String> effects = section.getStringList("effects");
                 String message = section.getString("message", null);
-                loaded.add(new ComboDefinition(name, ingredients, food, saturation, effects, message));
+                loadedPairings.add(new PairingDefinition(name, food, drink, effects, message));
             }
         }
-        // Большие комбо проверяем первыми, чтобы они имели приоритет над частичными.
-        loaded.sort(Comparator.comparingInt(ComboDefinition::getTotalIngredients).reversed());
-        combos = loaded;
-        plugin.getLogger().info("Загружено комбо: " + combos.size());
+        pairings = loadedPairings;
+
+        plugin.getLogger().info("Загружено: foods=" + foodBonuses.size() + ", pairings=" + pairings.size());
     }
 
-    /** Приводит ключ к каноническому виду. brewery:Name -> brewery:name (нижний регистр), материалы — в верхний регистр. */
     static String normalizeKey(String raw) {
         if (raw == null) {
             return "";
@@ -137,132 +117,85 @@ public class MealManager {
         return trimmed.toUpperCase();
     }
 
-    public void handleConsume(Player player, String ingredientKey) {
-        if (ingredientKey == null || ingredientKey.isEmpty() || combos.isEmpty()) {
+    // ===== Вызывается из листенера при поедании =====
+
+    public void handleConsume(Player player, String key) {
+        if (key == null || key.isEmpty()) {
             return;
         }
+        String normalized = normalizeKey(key);
         UUID uuid = player.getUniqueId();
-        long now = System.currentTimeMillis();
 
-        List<Consumed> list = recent.computeIfAbsent(uuid, k -> new ArrayList<>());
-        purgeOld(list, now);
-        list.add(new Consumed(normalizeKey(ingredientKey), now));
+        // Записываем для пар
+        List<Consumed> list = recentConsumes.computeIfAbsent(uuid, k -> new ArrayList<>());
+        purgeOld(list);
+        list.add(new Consumed(normalized, System.currentTimeMillis()));
 
-        evaluate(player, list, now);
+        // Проверяем пары
+        evaluatePairings(player, list);
     }
 
-    private void evaluate(Player player, List<Consumed> list, long now) {
-        Map<String, Long> triggers = lastTrigger.computeIfAbsent(player.getUniqueId(), k -> new HashMap<>());
-
-        for (ComboDefinition combo : combos) {
-            Long last = triggers.get(combo.getName());
-            if (last != null && now - last < comboCooldownMillis) {
-                continue;
-            }
-            if (!matches(list, combo)) {
-                continue;
-            }
-            applyReward(player, combo);
-            triggers.put(combo.getName(), now);
-            if (consumeOnCombo) {
-                removeIngredients(list, combo);
-            }
-        }
-    }
-
-    private boolean matches(List<Consumed> list, ComboDefinition combo) {
-        Map<String, Integer> available = new HashMap<>();
-        for (Consumed consumed : list) {
-            available.merge(consumed.key, 1, Integer::sum);
-        }
-        for (Map.Entry<String, Integer> required : combo.getIngredients().entrySet()) {
-            int have = available.getOrDefault(required.getKey(), 0);
-            if (have < required.getValue()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private void removeIngredients(List<Consumed> list, ComboDefinition combo) {
-        for (Map.Entry<String, Integer> required : combo.getIngredients().entrySet()) {
-            int toRemove = required.getValue();
-            Iterator<Consumed> it = list.iterator();
-            while (it.hasNext() && toRemove > 0) {
-                if (it.next().key.equals(required.getKey())) {
-                    it.remove();
-                    toRemove--;
+    private void evaluatePairings(Player player, List<Consumed> list) {
+        for (PairingDefinition pairing : pairings) {
+            boolean hasFood = false;
+            boolean hasDrink = false;
+            for (Consumed c : list) {
+                if (c.key.equals(pairing.food)) {
+                    hasFood = true;
+                }
+                if (c.key.equals(pairing.drink)) {
+                    hasDrink = true;
                 }
             }
+            if (hasFood && hasDrink) {
+                applyPairing(player, pairing);
+                // Убираем использованные из списка
+                removeFirst(list, pairing.food);
+                removeFirst(list, pairing.drink);
+            }
         }
     }
 
-    private void applyReward(Player player, ComboDefinition combo) {
-        if (combo.getFood() != 0) {            int newFood = Math.max(0, Math.min(20, player.getFoodLevel() + combo.getFood()));
-            player.setFoodLevel(newFood);
-        }
-        if (combo.getSaturation() != 0.0) {
-            float maxSaturation = player.getFoodLevel();
-            float newSaturation = (float) Math.max(0.0, Math.min(maxSaturation, player.getSaturation() + combo.getSaturation()));
-            player.setSaturation(newSaturation);
-        }
-        for (String effectString : combo.getEffects()) {
+    private void applyPairing(Player player, PairingDefinition pairing) {
+        for (String effectString : pairing.effects) {
             PotionEffect effect = parseEffect(effectString);
             if (effect != null) {
                 player.addPotionEffect(effect);
             }
         }
-        String message = combo.getMessage();
-        if (message != null && !message.isEmpty()) {
-            player.sendMessage(color(plugin.applyPlaceholders(player, message)));
+        if (pairing.message != null && !pairing.message.isEmpty()) {
+            player.sendMessage(color(plugin.applyPlaceholders(player, pairing.message)));
         }
-
-        // Сообщаем экосистеме (например, SopBattlePass), что комбо сработало.
+        // Событие для BattlePass
         try {
-            org.bukkit.Bukkit.getPluginManager().callEvent(
-                    new net.enelson.sopmeals.event.MealComboEvent(player, combo.getName()));
+            Bukkit.getPluginManager().callEvent(
+                    new net.enelson.sopmeals.event.MealComboEvent(player, pairing.name));
         } catch (Throwable ignored) {
         }
     }
 
-    private PotionEffect parseEffect(String raw) {
-        if (raw == null || raw.isEmpty()) {
-            return null;
-        }
-        try {
-            String[] parts = raw.split(":");
-            PotionEffectType type = PotionEffectType.getByName(parts[0].trim().toUpperCase());
-            if (type == null) {
-                plugin.getLogger().warning("Неизвестный эффект в комбо: " + parts[0]);
-                return null;
+    private void removeFirst(List<Consumed> list, String key) {
+        Iterator<Consumed> it = list.iterator();
+        while (it.hasNext()) {
+            if (it.next().key.equals(key)) {
+                it.remove();
+                return;
             }
-            int duration = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : 200;
-            int amplifier = parts.length > 2 ? Integer.parseInt(parts[2].trim()) : 0;
-            return new PotionEffect(type, duration, amplifier);
-        } catch (Exception exception) {
-            plugin.getLogger().warning("Не удалось разобрать эффект '" + raw + "': " + exception.getMessage());
-            return null;
         }
     }
 
-    private void purgeOld(List<Consumed> list, long now) {
+    private void purgeOld(List<Consumed> list) {
+        long cutoff = System.currentTimeMillis() - pairingWindowMillis;
         Iterator<Consumed> it = list.iterator();
         while (it.hasNext()) {
-            if (now - it.next().time > mealWindowMillis) {
+            if (it.next().time < cutoff) {
                 it.remove();
             }
         }
     }
 
-    public void clear(UUID uuid) {
-        recent.remove(uuid);
-        lastTrigger.remove(uuid);
-        repeatHistory.remove(uuid);
-    }
-
     // ===== Repeat limit =====
 
-    /** Записывает факт поедания ключа (для учёта повторов). */
     public void recordConsume(Player player, String key) {
         if (repeatMaxPerPeriod <= 0) {
             return;
@@ -274,7 +207,6 @@ public class MealManager {
         times.add(System.currentTimeMillis());
     }
 
-    /** Проверяет, превышен ли лимит повторов для данного ключа (без записи). */
     public boolean isRepeatLimitExceeded(Player player, String key) {
         if (repeatMaxPerPeriod <= 0) {
             return false;
@@ -310,7 +242,6 @@ public class MealManager {
         return repeatLimitMessage;
     }
 
-    /** Накладывает дебаффы переедания на игрока. */
     public void applyOvereatingEffects(Player player) {
         if (overeatingEffects == null || overeatingEffects.isEmpty()) {
             return;
@@ -325,7 +256,6 @@ public class MealManager {
 
     // ===== Per-food bonus =====
 
-    /** Применяет настроенный бонус за конкретный предмет (вне комбо). */
     public void applyFoodBonus(Player player, String key) {
         String normalized = normalizeKey(key);
         int[] bonus = foodBonuses.get(normalized);
@@ -345,8 +275,33 @@ public class MealManager {
         }
     }
 
+    // ===== Misc =====
+
     public boolean isBlockVanillaNutrition() {
         return blockVanillaNutrition;
+    }
+
+    public void clear(UUID uuid) {
+        repeatHistory.remove(uuid);
+        recentConsumes.remove(uuid);
+    }
+
+    private PotionEffect parseEffect(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return null;
+        }
+        try {
+            String[] parts = raw.split(":");
+            PotionEffectType type = PotionEffectType.getByName(parts[0].trim().toUpperCase());
+            if (type == null) {
+                return null;
+            }
+            int duration = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : 200;
+            int amplifier = parts.length > 2 ? Integer.parseInt(parts[2].trim()) : 0;
+            return new PotionEffect(type, duration, amplifier);
+        } catch (Exception exception) {
+            return null;
+        }
     }
 
     private static String color(String text) {
@@ -360,6 +315,22 @@ public class MealManager {
         Consumed(String key, long time) {
             this.key = key;
             this.time = time;
+        }
+    }
+
+    private static final class PairingDefinition {
+        final String name;
+        final String food;
+        final String drink;
+        final List<String> effects;
+        final String message;
+
+        PairingDefinition(String name, String food, String drink, List<String> effects, String message) {
+            this.name = name;
+            this.food = food;
+            this.drink = drink;
+            this.effects = effects != null ? effects : new ArrayList<>();
+            this.message = message;
         }
     }
 }
